@@ -1,5 +1,6 @@
 # Week 03：个人项目 Spring Boot 起步
 
+- 日期：2026-10-07
 - 本周任务：沿用第 02 周选题，创建可运行的 Spring Boot 工程（启动类、application.yml、`/api/hello`、Actuator 健康检查、`@SpringBootTest` 启动测试）。本周不涉及业务建模与数据库。
 
 ## 本周计划
@@ -45,7 +46,7 @@ cd monolith
 ./mvnw test
 ```
 
-结果（可重复通过）。以下为本人 Windows 机器（cmd，`C:\Users\linkunze\Desktop\weifuwu\microservices-practice-2401110736\monolith`）上的实际运行记录执行：
+结果（可重复通过）。以下为本人 Windows 机器（cmd，`C:\Users\linkunze\Desktop\weifuwu\microservices-practice-2401110736\monolith`）上的实际运行记录，2026-10-07 22:26 执行：
 
 ```text
 [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.107 s -- in com.zjgsu.linkunze.CampustradeMonolithApplicationTests
@@ -77,7 +78,15 @@ cd monolith
 {"groups":["liveness","readiness"],"status":"UP"}
 ```
 
-## 
+## 截图索引
+
+| 截图 | 内容 |
+| --- | --- |
+| [screenshots/01-project-structure.png](screenshots/01-project-structure.png) | 工程目录结构与关键文件 |
+| [screenshots/02-mvnw-test.png](screenshots/02-mvnw-test.png) | 本人机器 `./mvnw test` 执行与测试通过结果（真实截图，2026-10-07 22:26） |
+| [screenshots/03-app-startup.png](screenshots/03-app-startup.png) | 本人机器应用启动日志：Spring Boot 4.0.8 banner、Tomcat 8080（真实截图） |
+| [screenshots/04-api-hello.png](screenshots/04-api-hello.png) | 浏览器访问 `http://localhost:8080/api/hello` 的响应（真实截图） |
+| [screenshots/05-actuator-health.png](screenshots/05-actuator-health.png) | 浏览器访问 `http://localhost:8080/actuator/health` 返回 UP（真实截图） |
 
 ## 本周完成内容汇总
 
@@ -92,4 +101,4 @@ cd monolith
 1. **沙箱端口冲突**：验证环境 8080 被占用导致应用无法绑定，通过命令行参数 `--server.port=8081` 临时规避，工程默认端口仍为 8080，本地无需任何修改。
 2. **健康检查误报 DOWN**：排查后发现是验证环境的挂载文件系统报告可用磁盘为 0，磁盘空间健康指标误判；本地机器不存在该问题。为保证健康检查语义准确（反映应用自身状态），在 `application.yml` 中关闭了 diskspace 指标并注释说明。
 
-
+**本地复验确认（2026-10-07 晚）**：在本人 Windows 机器上，测试（22:26，`Tests run: 1, Failures: 0`，BUILD SUCCESS）、应用启动（Tomcat 8080）与两条接口（`/api/hello`、`/actuator/health` 返回 UP）全部实际运行通过，证据见 `screenshots/02~05`（均为本人机器真实截图）。

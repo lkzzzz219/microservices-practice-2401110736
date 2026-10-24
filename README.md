@@ -5,22 +5,79 @@
 > **学号**：2401110736
 > **仓库用途**：本课程唯一项目仓库，用于记录从需求分析、单体开发到微服务拆分、测试、部署与文档整理的全过程，每周作业见 [`docs/homework/`](docs/homework/)。
 
-## 快速开始（当前进度：Week 03 工程起步）
+## 快速开始（当前进度：Week 04 单体业务 + 数据库持久化）
 
-**环境要求**：JDK 25（`java --version` 验证），Maven 无需预装（工程自带 Maven Wrapper，自动下载 Maven 3.9.16）。
+**环境要求**：JDK 25（`java --version` 验证），Maven 无需预装（工程自带 Maven Wrapper，自动下载 Maven 3.9.16）。本地运行需要 MySQL 8.4；**运行测试不需要 MySQL**（测试使用 H2 内存库，自动准备数据）。
+
+### 1. 准备本地 MySQL（首次）
+
+安装并启动 MySQL 8.4 后，在 MySQL 客户端执行：
+
+```sql
+CREATE DATABASE IF NOT EXISTS campustrade;
+CREATE USER IF NOT EXISTS 'campustrade'@'localhost' IDENTIFIED BY '自己设一个密码';
+GRANT ALL PRIVILEGES ON campustrade.* TO 'campustrade'@'localhost';
+```
+
+应用通过环境变量读取连接信息（`monolith/src/main/resources/application.yml`）：
+
+- `DB_URL`（默认 `jdbc:mysql://localhost:3306/campustrade`）
+- `DB_USER`（默认 `campustrade`）
+- `DB_PASSWORD`（**无默认值，必须设置**）
+
+### 2. 运行测试（不需要 MySQL）
 
 ```bash
 cd monolith
-./mvnw test               # 运行启动测试（@SpringBootTest，验证应用上下文可加载）
+./mvnw test               # Windows PowerShell 用 .\mvnw.cmd test；28 个测试应全部通过
+```
+
+### 3. 启动应用
+
+```bash
+# Linux / macOS：
+export DB_PASSWORD='自己设的密码'
+# Windows PowerShell：
+#   $env:DB_PASSWORD = '自己设的密码'
 ./mvnw spring-boot:run    # 启动应用，默认端口 8080
 ```
 
-| 验证项 | 地址 | 预期结果 |
-| --- | --- | --- |
-| 问候接口 | `http://localhost:8080/api/hello` | JSON，含项目名称与问候消息 |
-| 健康检查 | `http://localhost:8080/actuator/health` | `{"status":"UP"}` |
+### 4. 调用接口验证
 
-**当前尚未实现的业务能力**：用户注册登录、商品发布与管理、订单流程、消息沟通、搜索等所有业务功能——本周仅完成可运行的工程骨架与运行状态验证，业务模型（Item、Order）的规划见 [docs/project-proposal.md](docs/project-proposal.md)，将从下一周开始逐步实现。
+```bash
+# ① 发布商品（201）
+curl -i -X POST http://localhost:8080/api/items \
+  -H 'Content-Type: application/json' \
+  -d '{"sellerId":"u-seller","title":"九成新自行车","description":"毕业转让","price":120.00}'
+
+# ② 浏览在售商品列表（200）
+curl -i http://localhost:8080/api/items
+
+# ③ 下单：把 ITEM_ID 换成 ① 返回的商品 id（201；商品随即被锁定 RESERVED）
+curl -i -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"itemId":"ITEM_ID","buyerId":"u-buyer"}'
+
+# ④ 取消订单：把 ORDER_ID 换成 ③ 返回的订单 id（200；商品回到在售）
+curl -i -X POST http://localhost:8080/api/orders/ORDER_ID/cancel
+```
+
+主要接口一览：
+
+| 接口 | 方法 | 成功状态 | 说明 |
+| --- | --- | --- | --- |
+| `/api/items` | POST | 201 | 发布商品（价格必须大于 0，否则 400） |
+| `/api/items` | GET | 200 | 在售商品列表 |
+| `/api/items/{id}` | GET | 200 / 404 | 商品详情 |
+| `/api/orders` | POST | 201 / 400 / 404 / 409 | 下单（商品须在售、非卖家本人、无进行中订单） |
+| `/api/orders/{id}` | GET | 200 / 404 | 订单详情 |
+| `/api/orders?buyerId=xx` | GET | 200 | 某买家的订单列表 |
+| `/api/orders/{id}/cancel` | POST | 200 / 404 / 409 | 取消订单，商品回到在售 |
+| `/api/orders/{id}/complete` | POST | 200 / 404 / 409 | 确认成交，商品标记售出 |
+| `/api/hello` | GET | 200 | 工程起步时的运行状态验证接口（保留） |
+| `/actuator/health` | GET | 200 | 健康检查 |
+
+**本周已实现的业务能力**：商品发布与在售列表查询、下单/取消/确认成交的完整订单流程（含「不能买自己的商品、不能重复下单」等业务规则）、MySQL 持久化。尚未实现：用户注册登录、消息沟通、搜索、评价等，规划见 [docs/project-proposal.md](docs/project-proposal.md)；表结构设计见 [docs/database.md](docs/database.md)。
 
 ## 目录
 
@@ -190,11 +247,13 @@ sequenceDiagram
 │   ├── mvnw                   # Maven Wrapper
 │   └── src/                   # 启动类、配置、接口与测试
 ├── docs/
-│   ├── project-proposal.md    # 项目选题说明（业务场景与核心模型规划）
+│   ├── project-proposal.md    # 项目选题说明（业务场景、核心模型与业务流程）
+│   ├── database.md            # 数据库设计（Week 04）
 │   └── homework/              # 每周作业记录
 │       ├── week-01/           # 开发环境与个人仓库
 │       ├── week-02/           # 项目选题与功能规划
-│       └── week-03/           # Spring Boot 工程起步
+│       ├── week-03/           # Spring Boot 工程起步
+│       └── week-04/           # 单体业务与数据库持久化
 └── src/                       # （预留，后续按课程要求调整使用）
 ```
 
@@ -203,3 +262,4 @@ sequenceDiagram
 - [Week 01：开发环境与个人仓库](docs/homework/week-01/index.md)
 - [Week 02：项目选题与功能规划](docs/homework/week-02/index.md)
 - [Week 03：Spring Boot 工程起步](docs/homework/week-03/index.md)
+- [Week 04：单体应用与数据库持久化](docs/homework/week-04/index.md)

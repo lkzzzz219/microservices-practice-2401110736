@@ -27,35 +27,70 @@
 
 优先实现它的原因：它是平台价值的最大闭环，覆盖用户、商品、订单三个最核心模型；消息沟通与搜索可以随后叠加。
 
-## 两个核心模型（本周只做规划，不实现）
+## 两个核心模型（Week 04 已按此实现）
 
-### 模型一：商品（Item）
-
-| 字段 | 类型 | 说明 |
-| --- | --- | --- |
-| id | Long | 主键 |
-| title | String | 标题 |
-| description | String | 描述 |
-| price | BigDecimal | 价格（元） |
-| category | String/枚举 | 分类（教材/数码/生活…） |
-| status | 枚举 | 在售 / 锁定 / 已下架 |
-| sellerId | Long | 发布者（关联用户） |
-| createdAt / updatedAt | LocalDateTime | 时间戳 |
-
-### 模型二：订单（Order）
+### 模型一：商品（Item，表 `items`）
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| id | Long | 主键 |
-| itemId | Long | 商品（关联商品） |
-| buyerId | Long | 买家（关联用户） |
-| sellerId | Long | 卖家（冗余，便于查询） |
-| status | 枚举 | 待确认 / 已确认 / 已成交 / 已取消 |
-| remark | String | 买家备注（面交时间地点等） |
-| createdAt / updatedAt | LocalDateTime | 时间戳 |
+| id | String(UUID) | 主键 |
+| seller_id | String | 发布者（卖家）用户 id |
+| title | String(100) | 标题，非空 |
+| description | String(1000) | 描述 |
+| price | Decimal(10,2) | 价格（元），必须大于 0 |
+| status | 枚举字符串 | ON_SALE 在售 / RESERVED 被订单锁定 / SOLD 已售出 |
+| created_at | LocalDateTime | 发布时间，非空 |
 
-订单状态只允许沿「待确认 → 已确认 → 已成交/已取消」路径流转，由状态机保证，后续微服务拆分时订单服务以此为核心聚合。
+### 模型二：订单（TradeOrder，表 `trade_orders`，避开 SQL 保留字 ORDER）
 
-## 本周实现范围（Week 03）
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | String(UUID) | 主键 |
+| item_id | String | 商品 id（逻辑外键指向 items.id），非空 |
+| buyer_id | String | 买家用户 id，非空 |
+| amount | Decimal(10,2) | 成交金额快照（下单时复制商品价格，不受后续改价影响），非空 |
+| status | 枚举字符串 | CREATED 进行中 / COMPLETED 已成交 / CANCELLED 已取消 |
+| created_at | LocalDateTime | 下单时间，非空 |
 
-仅完成 Spring Boot 工程起步：可运行的空壳工程、`/api/hello` 运行状态验证接口、`/actuator/health` 健康检查和 `@SpringBootTest` 启动测试。**不包含**上述业务模型的代码实现。
+两实体关系：一个商品在任意时刻最多关联一条进行中的订单（Order.itemId → Item.id，逻辑外键）；订单只保存商品 id 与买家 id，不直接持有商品对象，与课堂实践「Enrollment 只存 studentId/courseId」的解耦方式一致。
+
+订单状态只允许沿「CREATED → COMPLETED / CANCELLED」路径流转，终态不可再变，由 Service 层规则保证。
+
+## Week 04 业务建模：本周实现的核心业务流程
+
+**流程：买家下单 → 取消/成交的商品状态联动**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as 买家
+    participant P as 平台(OrderService)
+    participant I as 商品(Item)
+    B->>P: POST /api/orders (itemId, buyerId)
+    P->>P: 校验规则：商品存在、在售、非卖家本人、无进行中订单
+    P->>I: 商品状态 ON_SALE → RESERVED
+    P-->>B: 201 返回订单(CREATED)
+    alt 取消订单
+        B->>P: POST /api/orders/{id}/cancel
+        P->>I: 商品状态 RESERVED → ON_SALE（商品重新可买）
+        P-->>B: 200 订单状态 CANCELLED
+    else 线下交付后确认成交
+        B->>P: POST /api/orders/{id}/complete
+        P->>I: 商品状态 RESERVED → SOLD（终态）
+        P-->>B: 200 订单状态 COMPLETED
+    end
+```
+
+**在 Service 中检查的业务规则**（`OrderService.placeOrder`，任一不满足即拒绝且不产生任何修改）：
+
+1. 商品必须存在，否则 404；
+2. 商品必须处于 ON_SALE（被锁定或已售出的商品不能下单），否则 409；
+3. 买家不能购买自己发布的商品（sellerId == buyerId 拒绝），否则 409；
+4. 同一商品不能同时存在两条 CREATED 状态的订单，否则 409；
+5. 全部通过后创建订单（金额取商品价格快照）并将商品置为 RESERVED，两次写入在同一事务中完成。
+
+取消与成交规则：只有 CREATED 状态的订单可以取消/成交；取消后商品回到 ON_SALE（可重新下单），成交后商品 SOLD（终态）。
+
+## 历史实现范围（Week 03）
+
+Week 03 仅完成 Spring Boot 工程起步：可运行的空壳工程、`/api/hello` 运行状态验证接口、`/actuator/health` 健康检查和 `@SpringBootTest` 启动测试，不包含业务模型代码实现。

@@ -1,0 +1,11 @@
+# 测试专用配置：使用 H2 内存数据库，避免测试连接本机 MySQL。
+# 该文件只在测试 classpath 生效；测试数据由测试代码在 @BeforeEach 中准备，可重复执行。
+spring:
+  datasource:
+    url: jdbc:h2:mem:campustrade;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
