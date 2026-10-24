@@ -58,4 +58,10 @@
 
 **运行命令**：`cd monolith && ./mvnw test`（Windows：`.\mvnw.cmd test`），实测两次均 `Tests run: 28, Failures: 0, Errors: 0` + `BUILD SUCCESS`。
 
+**截图索引**（`screenshots/`）：
 
+| 文件 | 内容 |
+| --- | --- |
+| `01-code-order-service.png` | 核心代码：`OrderService`（业务规则+事务）与 `OrderController`（接口） |
+| `02-mvnw-test.png` | `mvnw test` 全部 28 个测试通过 |
+| `03-api-run.png` | curl 实测：发布商品 201 → 下单 201 → 重复下单 409 → 取消 200 → 列表 |

@@ -5,7 +5,62 @@
 > **学号**：2401110736
 > **仓库用途**：本课程唯一项目仓库，用于记录从需求分析、单体开发到微服务拆分、测试、部署与文档整理的全过程，每周作业见 [`docs/homework/`](docs/homework/)。
 
-## 快速开始（当前进度：Week 04 单体业务 + 数据库持久化）
+## 快速开始（当前进度：Week 05 Docker 容器化）
+
+### 方式一：Docker 一键启动（推荐，Week 05）
+
+**环境要求**：安装 Docker Desktop 并处于运行状态（`docker --version`、`docker compose version` 可正常输出）。无需本机安装 JDK 或 Maven——镜像构建全部在容器内完成。
+
+#### 1. 准备环境变量
+
+```bash
+cp .env.example .env        # Windows PowerShell 用：copy .env.example .env
+# 用记事本/编辑器打开 .env，把两处 choose-... 占位符改成真实密码
+```
+
+`.env` 已被 `.gitignore` 忽略，不会提交；真实密码只存在于本机。
+
+#### 2. 构建镜像并一键启动
+
+```bash
+docker build -t campustrade:week05 ./monolith   # 多阶段构建，生成可运行镜像
+docker compose up -d --build                    # 一键启动 app + mysql（compose 自动完成构建）
+docker compose ps                               # 查看状态：app 应为 running，mysql 应为 healthy
+docker compose logs -f app                      # 需要时查看应用日志，Ctrl+C 退出
+```
+
+#### 3. 停止与清理
+
+```bash
+docker compose down          # 停止并删除容器，命名数据卷 mysql-data 保留（数据不丢）
+docker compose up -d         # 再次启动，数据原样恢复
+docker compose down -v       # ⚠️ 连同数据卷一起删除，会丢失全部数据，仅在需要重置时使用
+```
+
+#### 4. 调用接口验证（容器化）
+
+```bash
+# 健康检查（200，{"status":"UP"}）
+curl -i http://localhost:8080/actuator/health
+
+# ① 创建商品（201）
+curl -i -X POST http://localhost:8080/api/items \
+  -H 'Content-Type: application/json' \
+  -d '{"sellerId":"u-seller","title":"九成新自行车","description":"毕业转让","price":120.00}'
+
+# ② 查询在售商品列表（200）
+curl -i http://localhost:8080/api/items
+
+# ③ 下单：把 ITEM_ID 换成 ① 返回的商品 id（201）
+curl -i -X POST http://localhost:8080/api/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"itemId":"ITEM_ID","buyerId":"u-buyer"}'
+
+# ④ 查询订单详情：把 ORDER_ID 换成 ③ 返回的订单 id（200）
+curl -i http://localhost:8080/api/orders/ORDER_ID
+```
+
+### 方式二：本地开发（Week 04 方式，仍然可用）
 
 **环境要求**：JDK 25（`java --version` 验证），Maven 无需预装（工程自带 Maven Wrapper，自动下载 Maven 3.9.16）。本地运行需要 MySQL 8.4；**运行测试不需要 MySQL**（测试使用 H2 内存库，自动准备数据）。
 
@@ -77,7 +132,7 @@ curl -i -X POST http://localhost:8080/api/orders/ORDER_ID/cancel
 | `/api/hello` | GET | 200 | 工程起步时的运行状态验证接口（保留） |
 | `/actuator/health` | GET | 200 | 健康检查 |
 
-**本周已实现的业务能力**：商品发布与在售列表查询、下单/取消/确认成交的完整订单流程（含「不能买自己的商品、不能重复下单」等业务规则）、MySQL 持久化。尚未实现：用户注册登录、消息沟通、搜索、评价等，规划见 [docs/project-proposal.md](docs/project-proposal.md)；表结构设计见 [docs/database.md](docs/database.md)。
+**本周已实现的业务能力**：商品发布与在售列表查询、下单/取消/确认成交的完整订单流程（含「不能买自己的商品、不能重复下单」等业务规则）、MySQL 持久化、Docker 多阶段镜像构建与 Compose 一键编排（含数据卷持久化）。尚未实现：用户注册登录、消息沟通、搜索、评价等，规划见 [docs/project-proposal.md](docs/project-proposal.md)；表结构设计见 [docs/database.md](docs/database.md)。
 
 ## 目录
 
@@ -242,7 +297,11 @@ sequenceDiagram
 ```text
 .
 ├── README.md                  # 项目总览（本文件）
+├── compose.yaml               # Docker Compose 编排：app + MySQL 8.4.11（Week 05）
+├── .env.example               # 环境变量模板（复制为 .env 使用，真实密码不入库）
 ├── monolith/                  # 单体工程（Week 03 起步，逐步演进到微服务）
+│   ├── Dockerfile             # 多阶段构建：Maven 构建 + JRE 运行（Week 05）
+│   ├── .dockerignore          # 镜像构建忽略规则（Week 05）
 │   ├── pom.xml                # Maven 工程（Spring Boot 4.0.x / Java 25）
 │   ├── mvnw                   # Maven Wrapper
 │   └── src/                   # 启动类、配置、接口与测试
@@ -253,7 +312,8 @@ sequenceDiagram
 │       ├── week-01/           # 开发环境与个人仓库
 │       ├── week-02/           # 项目选题与功能规划
 │       ├── week-03/           # Spring Boot 工程起步
-│       └── week-04/           # 单体业务与数据库持久化
+│       ├── week-04/           # 单体业务与数据库持久化
+│       └── week-05/           # Docker 容器化
 └── src/                       # （预留，后续按课程要求调整使用）
 ```
 
@@ -263,3 +323,4 @@ sequenceDiagram
 - [Week 02：项目选题与功能规划](docs/homework/week-02/index.md)
 - [Week 03：Spring Boot 工程起步](docs/homework/week-03/index.md)
 - [Week 04：单体应用与数据库持久化](docs/homework/week-04/index.md)
+- [Week 05：Docker 容器化](docs/homework/week-05/index.md)

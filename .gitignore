@@ -1,0 +1,9 @@
+# 环境变量文件包含真实密码，绝不能提交
+.env
+
+# 操作系统与编辑器产物
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/

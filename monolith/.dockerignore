@@ -1,0 +1,22 @@
+# 本地构建产物
+target/
+*.jar
+*.class
+
+# IDE 与编辑器配置
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# 版本控制与本地产物
+.git/
+.gitignore
+*.log
+
+# 文档与说明文件不参与镜像构建
+HELP.md
