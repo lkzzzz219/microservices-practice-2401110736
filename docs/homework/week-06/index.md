@@ -4,7 +4,7 @@
 
 仓库链接：<https://github.com/lkzzzz219/microservices-practice-2401110736>
 
-本周运行、各服务测试和配置说明集中在新增的 [services/README.md](../../../services/README.md)。原 README、环境变量模板、忽略文件、旧周次文档和单体代码保持原样；已有文件中仅按本周要求更新根目录 compose.yaml，旧编排完整保存为 compose.monolith.yaml。
+本周运行、各服务测试和配置说明集中在新增的 [services/README.md](../../../services/README.md)。原环境变量模板、忽略文件、旧周次文档和单体代码保持原样；已有文件中按本周要求更新根目录 compose.yaml，并在总 README 补充本周入口与运行测试命令，旧编排完整保存为 compose.monolith.yaml。
 
 ## 1. 服务拆分设计
 

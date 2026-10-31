@@ -5,7 +5,52 @@
 > **学号**：2401110736
 > **仓库用途**：本课程唯一项目仓库，用于记录从需求分析、单体开发到微服务拆分、测试、部署与文档整理的全过程，每周作业见 [`docs/homework/`](docs/homework/)。
 
-## 快速开始（当前进度：Week 05 Docker 容器化）
+## 快速开始（当前进度：Week 06 微服务拆分）
+
+第 6 周已完成用户、商品、订单三个独立 Spring Boot 服务，使用独立数据库和账号，通过 RestTemplate 进行 HTTP 协作。原 `monolith/` 保留，新增服务位于 `services/`，基础包为 `com.zjgsu.lkz`。
+
+- [第 6 周作业：实现过程、验证结果与四张实际运行截图](docs/homework/week-06/index.md)
+- [服务边界设计与 Mermaid 架构图](docs/microservices-design.md)
+- [微服务运行、配置与接口说明](services/README.md)
+
+| 服务 | 端口 | 数据库 | 数据表 |
+| --- | --- | --- | --- |
+| user-service | 8081 | campustrade_users | users |
+| product-service | 8082 | campustrade_products | items |
+| order-service | 8083 | campustrade_orders | trade_orders |
+
+商品发布前通过 HTTP 校验卖家；下单先校验买家，再请求商品服务锁定商品，最后保存订单。各服务只读写自己的数据库，跨服务保存 ID，不直接访问其他服务的 Repository。依赖资源不存在返回 404，业务冲突返回 409，依赖不可用或超时返回 503；校验失败不新增订单。
+
+### 启动与验证（仓库根目录）
+
+启动需要运行中的 Docker Desktop；镜像内完成编译，无需本机安装 Java 或 Maven。本地教学默认配置可直接启动，密码覆盖变量见 [services/.env.example](services/.env.example)。
+
+```bash
+docker compose up -d --build
+docker compose ps
+# 以下命令需要 Bash、curl、Python 3；Windows 可在 Git Bash 中执行
+bash scripts/smoke-test.sh
+# 额外验证依赖停机：短暂停止商品服务，检查 503 和订单数不变，退出时恢复
+bash scripts/smoke-test.sh --with-outage
+docker compose down  # 保留三个数据库的命名数据卷
+```
+
+三个服务均提供 `GET /actuator/health`。已实测六个容器全部 healthy、下单/取消/成交成功、404/409/503 失败场景和数据库容器重建后数据保留。远端成功但本地写入失败仍存在一致性窗口，分析见设计文档；本周未实现跨服务原子事务或自动补偿。
+
+### 运行测试（仓库根目录）
+
+本机需要 JDK 25 和 Maven；测试使用 H2，不依赖 MySQL 或 Docker。
+
+```bash
+mvn -f services/user-service/pom.xml test
+mvn -f services/product-service/pom.xml test
+mvn -f services/order-service/pom.xml test
+mvn -f monolith/pom.xml test
+```
+
+三个微服务分别有 2、3、5 个测试，共 10 个全部通过；保留的单体另有 28 个回归测试通过。未安装 Maven 时，进入对应工程目录执行 `./mvnw test`，PowerShell 使用 `.\mvnw.cmd test`。
+
+## 单体版本运行方式（Week 04 / Week 05，保留对照）
 
 ### 方式一：Docker 一键启动（推荐，Week 05）
 
@@ -24,17 +69,17 @@ cp .env.example .env        # Windows PowerShell 用：copy .env.example .env
 
 ```bash
 docker build -t campustrade:week05 ./monolith   # 多阶段构建，生成可运行镜像
-docker compose up -d --build                    # 一键启动 app + mysql（compose 自动完成构建）
-docker compose ps                               # 查看状态：app 应为 running，mysql 应为 healthy
-docker compose logs -f app                      # 需要时查看应用日志，Ctrl+C 退出
+docker compose -f compose.monolith.yaml up -d --build                    # 一键启动 app + mysql（compose 自动完成构建）
+docker compose -f compose.monolith.yaml ps                               # 查看状态：app 应为 running，mysql 应为 healthy
+docker compose -f compose.monolith.yaml logs -f app                      # 需要时查看应用日志，Ctrl+C 退出
 ```
 
 #### 3. 停止与清理
 
 ```bash
-docker compose down          # 停止并删除容器，命名数据卷 mysql-data 保留（数据不丢）
-docker compose up -d         # 再次启动，数据原样恢复
-docker compose down -v       # ⚠️ 连同数据卷一起删除，会丢失全部数据，仅在需要重置时使用
+docker compose -f compose.monolith.yaml down          # 停止并删除容器，命名数据卷 mysql-data 保留（数据不丢）
+docker compose -f compose.monolith.yaml up -d         # 再次启动，数据原样恢复
+docker compose -f compose.monolith.yaml down -v       # ⚠️ 连同数据卷一起删除，会丢失全部数据，仅在需要重置时使用
 ```
 
 #### 4. 调用接口验证（容器化）
@@ -132,7 +177,7 @@ curl -i -X POST http://localhost:8080/api/orders/ORDER_ID/cancel
 | `/api/hello` | GET | 200 | 工程起步时的运行状态验证接口（保留） |
 | `/actuator/health` | GET | 200 | 健康检查 |
 
-**本周已实现的业务能力**：商品发布与在售列表查询、下单/取消/确认成交的完整订单流程（含「不能买自己的商品、不能重复下单」等业务规则）、MySQL 持久化、Docker 多阶段镜像构建与 Compose 一键编排（含数据卷持久化）。尚未实现：用户注册登录、消息沟通、搜索、评价等，规划见 [docs/project-proposal.md](docs/project-proposal.md)；表结构设计见 [docs/database.md](docs/database.md)。
+**单体版本已实现的业务能力（Week 04 / Week 05）**：商品发布与在售列表查询、下单/取消/确认成交的完整订单流程（含「不能买自己的商品、不能重复下单」等业务规则）、MySQL 持久化、Docker 多阶段镜像构建与 Compose 一键编排（含数据卷持久化）。尚未实现：用户注册登录、消息沟通、搜索、评价等，规划见 [docs/project-proposal.md](docs/project-proposal.md)；表结构设计见 [docs/database.md](docs/database.md)。
 
 ## 目录
 
@@ -285,7 +330,7 @@ sequenceDiagram
 | 方向 | 计划 |
 | --- | --- |
 | **认证** | 引入 Spring Security + JWT 实现无状态登录；管理员与学生角色权限分离 |
-| **服务拆分** | 单体按业务边界拆分为：API 网关（Spring Cloud Gateway）、用户服务、商品服务、订单服务、消息服务，各服务独立数据库 |
+| **服务拆分** | Week 06 已完成用户、商品、订单三个服务及独立数据库；后续扩展 API 网关（Spring Cloud Gateway）和消息服务 |
 | **服务治理** | Nacos 实现服务发现与配置中心；OpenFeign 声明式服务调用；LoadBalancer 负载均衡；Resilience4j 断路器与容错 |
 | **消息** | 引入消息队列（RabbitMQ），实现订单事件异步通知（如订单状态变更通知消息服务），服务间解耦 |
 | **分布式事务** | 对「下单锁库存 + 创建订单」等多服务写操作，用 Seata 或最终一致性方案保证数据一致 |
@@ -297,9 +342,12 @@ sequenceDiagram
 ```text
 .
 ├── README.md                  # 项目总览（本文件）
-├── compose.yaml               # Docker Compose 编排：app + MySQL 8.4.11（Week 05）
+├── compose.yaml               # Week 06：三个微服务 + 三个独立 MySQL
+├── compose.monolith.yaml      # Week 05 单体编排备份
+├── services/                  # 用户、商品、订单独立工程及微服务 README
+├── scripts/smoke-test.sh       # 健康检查、跨服务业务与失败场景验证
 ├── .env.example               # 环境变量模板（复制为 .env 使用，真实密码不入库）
-├── monolith/                  # 单体工程（Week 03 起步，逐步演进到微服务）
+├── monolith/                  # 保留的单体工程（Week 03—Week 05）
 │   ├── Dockerfile             # 多阶段构建：Maven 构建 + JRE 运行（Week 05）
 │   ├── .dockerignore          # 镜像构建忽略规则（Week 05）
 │   ├── pom.xml                # Maven 工程（Spring Boot 4.0.x / Java 25）
@@ -308,12 +356,14 @@ sequenceDiagram
 ├── docs/
 │   ├── project-proposal.md    # 项目选题说明（业务场景、核心模型与业务流程）
 │   ├── database.md            # 数据库设计（Week 04）
+│   ├── microservices-design.md # 服务边界、数据归属与架构图（Week 06）
 │   └── homework/              # 每周作业记录
 │       ├── week-01/           # 开发环境与个人仓库
 │       ├── week-02/           # 项目选题与功能规划
 │       ├── week-03/           # Spring Boot 工程起步
 │       ├── week-04/           # 单体业务与数据库持久化
-│       └── week-05/           # Docker 容器化
+│       ├── week-05/           # Docker 容器化
+│       └── week-06/           # 微服务拆分、编排、验证与截图
 └── src/                       # （预留，后续按课程要求调整使用）
 ```
 
@@ -324,3 +374,7 @@ sequenceDiagram
 - [Week 03：Spring Boot 工程起步](docs/homework/week-03/index.md)
 - [Week 04：单体应用与数据库持久化](docs/homework/week-04/index.md)
 - [Week 05：Docker 容器化](docs/homework/week-05/index.md)
+
+- [Week 06：微服务拆分、HTTP 协作与本地编排](docs/homework/week-06/index.md)
+- [微服务设计与架构图](docs/microservices-design.md)
+- [微服务运行与测试说明](services/README.md)
