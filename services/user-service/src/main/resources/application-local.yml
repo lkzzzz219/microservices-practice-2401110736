@@ -1,0 +1,6 @@
+spring:
+  datasource:
+    url: jdbc:h2:file:./.data/user-service;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: user_service
+    password: local_demo

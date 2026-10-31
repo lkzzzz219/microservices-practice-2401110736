@@ -1,56 +1,111 @@
-# ============================================================
-# CampusTrade 全栈编排：应用 + MySQL 8.4.11
-# 使用方式：
-#   1. cp .env.example .env   并填写真实密码
-#   2. docker compose up -d --build
-# 说明：不使用已废弃的 version 字段；应用通过服务名 mysql 连接数据库。
-# ============================================================
-
-name: campustrade
-
+name: campustrade-microservices
 services:
-  mysql:
+  users-db:
     image: mysql:8.4.11
-    container_name: campustrade-mysql
     environment:
-      MYSQL_DATABASE: ${DB_NAME:-campustrade}
-      MYSQL_USER: ${DB_USER:-campustrade}
-      MYSQL_PASSWORD: ${DB_PASSWORD:?请先在 .env 中设置 DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请先在 .env 中设置 MYSQL_ROOT_PASSWORD}
-    ports:
-      # 本机 3306 常被本地 MySQL 占用，映射到 3308 便于需要时从本机排查
-      - "3308:3306"
+      MYSQL_DATABASE: campustrade_users
+      MYSQL_USER: users_app
+      MYSQL_PASSWORD: ${USERS_DB_PASSWORD:-users_local_week06}
+      MYSQL_ROOT_PASSWORD: ${USERS_ROOT_PASSWORD:-users_root_local_week06}
     volumes:
-      # 命名数据卷：容器删除重建后数据仍保留（持久化验证的关键）
-      - mysql-data:/var/lib/mysql
+      - users-data:/var/lib/mysql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}" ]
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER -D $$MYSQL_DATABASE -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+  user-service:
+    build: ./services/user-service
+    image: campustrade/user-service:week06
+    environment:
+      DB_URL: jdbc:mysql://users-db:3306/campustrade_users
+      DB_USER: users_app
+      DB_PASSWORD: ${USERS_DB_PASSWORD:-users_local_week06}
+      USER_SERVICE_URL: http://user-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8082
+    ports:
+      - "8081:8081"
+    depends_on:
+      users-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/actuator/health"]
       interval: 5s
       timeout: 3s
-      retries: 20
-    networks:
-      - campustrade-net
-
-  app:
-    build:
-      context: ./monolith
-    image: campustrade:week05
-    container_name: campustrade-app
+      retries: 40
+      start_period: 30s
+  products-db:
+    image: mysql:8.4.11
     environment:
-      # 通过数据库服务名 mysql 访问，不经本机端口
-      DB_URL: jdbc:mysql://mysql:3306/${DB_NAME:-campustrade}
-      DB_USER: ${DB_USER:-campustrade}
-      DB_PASSWORD: ${DB_PASSWORD:?请先在 .env 中设置 DB_PASSWORD}
+      MYSQL_DATABASE: campustrade_products
+      MYSQL_USER: products_app
+      MYSQL_PASSWORD: ${PRODUCTS_DB_PASSWORD:-products_local_week06}
+      MYSQL_ROOT_PASSWORD: ${PRODUCTS_ROOT_PASSWORD:-products_root_local_week06}
+    volumes:
+      - products-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER -D $$MYSQL_DATABASE -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+  product-service:
+    build: ./services/product-service
+    image: campustrade/product-service:week06
+    environment:
+      DB_URL: jdbc:mysql://products-db:3306/campustrade_products
+      DB_USER: products_app
+      DB_PASSWORD: ${PRODUCTS_DB_PASSWORD:-products_local_week06}
+      USER_SERVICE_URL: http://user-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8082
     ports:
-      - "8080:8080"
+      - "8082:8082"
     depends_on:
-      mysql:
+      products-db:
         condition: service_healthy
-    networks:
-      - campustrade-net
-
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 30s
+  orders-db:
+    image: mysql:8.4.11
+    environment:
+      MYSQL_DATABASE: campustrade_orders
+      MYSQL_USER: orders_app
+      MYSQL_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_local_week06}
+      MYSQL_ROOT_PASSWORD: ${ORDERS_ROOT_PASSWORD:-orders_root_local_week06}
+    volumes:
+      - orders-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER -D $$MYSQL_DATABASE -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 30s
+  order-service:
+    build: ./services/order-service
+    image: campustrade/order-service:week06
+    environment:
+      DB_URL: jdbc:mysql://orders-db:3306/campustrade_orders
+      DB_USER: orders_app
+      DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_local_week06}
+      USER_SERVICE_URL: http://user-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8082
+    ports:
+      - "8083:8083"
+    depends_on:
+      orders-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 30s
 volumes:
-  mysql-data:
-
-networks:
-  campustrade-net:
+  users-data:
+  products-data:
+  orders-data:

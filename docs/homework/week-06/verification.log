@@ -1,0 +1,70 @@
+=== Health checks ===
+curl: (52) Empty reply from server
+curl: (52) Empty reply from server
+http://localhost:8081/actuator/health -> HTTP 200 {"groups":["liveness","readiness"],"status":"UP"}
+http://localhost:8082/actuator/health -> HTTP 200 {"groups":["liveness","readiness"],"status":"UP"}
+http://localhost:8083/actuator/health -> HTTP 200 {"groups":["liveness","readiness"],"status":"UP"}
+=== Create users and product ===
+POST http://localhost:8081/api/users -> HTTP 201
+{"id":"7fd307ed-c299-4d1f-936a-8800d41d9cba","displayName":"smoke-seller"}
+POST http://localhost:8081/api/users -> HTTP 201
+{"id":"2c2bef50-c3e1-43ae-8bae-8b164495702e","displayName":"smoke-buyer"}
+POST http://localhost:8082/api/items -> HTTP 201
+{"id":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"ON_SALE","createdAt":"2026-10-31T11:20:18.050627197"}
+=== Reserve, duplicate rejection, cancel, reorder, complete ===
+POST http://localhost:8083/api/orders -> HTTP 201
+{"id":"fa89dde3-172f-4dea-94db-1cab541949fe","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CREATED","createdAt":"2026-10-31T11:20:18.43864408"}
+GET http://localhost:8082/api/items/a42ff66e-0dc5-41c5-92fa-8be47d2c6b92 -> HTTP 200
+{"id":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"RESERVED","createdAt":"2026-10-31T11:20:18.050627"}
+POST http://localhost:8083/api/orders -> HTTP 409
+{"detail":"Dependency business conflict","instance":"/api/orders","status":409,"title":"Conflict"}
+GET http://localhost:8083/api/orders?buyerId=2c2bef50-c3e1-43ae-8bae-8b164495702e -> HTTP 200
+[{"id":"fa89dde3-172f-4dea-94db-1cab541949fe","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CREATED","createdAt":"2026-10-31T11:20:18.438644"}]
+POST http://localhost:8083/api/orders/fa89dde3-172f-4dea-94db-1cab541949fe/cancel -> HTTP 200
+{"id":"fa89dde3-172f-4dea-94db-1cab541949fe","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CANCELLED","createdAt":"2026-10-31T11:20:18.438644"}
+GET http://localhost:8082/api/items/a42ff66e-0dc5-41c5-92fa-8be47d2c6b92 -> HTTP 200
+{"id":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"ON_SALE","createdAt":"2026-10-31T11:20:18.050627"}
+POST http://localhost:8083/api/orders -> HTTP 201
+{"id":"08a3f59e-abad-4cdd-9155-61685522cff7","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CREATED","createdAt":"2026-10-31T11:20:21.553133181"}
+POST http://localhost:8083/api/orders/08a3f59e-abad-4cdd-9155-61685522cff7/complete -> HTTP 200
+{"id":"08a3f59e-abad-4cdd-9155-61685522cff7","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"COMPLETED","createdAt":"2026-10-31T11:20:21.553133"}
+GET http://localhost:8082/api/items/a42ff66e-0dc5-41c5-92fa-8be47d2c6b92 -> HTTP 200
+{"id":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"SOLD","createdAt":"2026-10-31T11:20:18.050627"}
+=== Missing dependency resource: orders must remain unchanged ===
+GET http://localhost:8083/api/orders?buyerId=2c2bef50-c3e1-43ae-8bae-8b164495702e -> HTTP 200
+[{"id":"08a3f59e-abad-4cdd-9155-61685522cff7","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"COMPLETED","createdAt":"2026-10-31T11:20:21.553133"},{"id":"fa89dde3-172f-4dea-94db-1cab541949fe","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CANCELLED","createdAt":"2026-10-31T11:20:18.438644"}]
+POST http://localhost:8083/api/orders -> HTTP 404
+{"detail":"Dependency resource not found","instance":"/api/orders","status":404,"title":"Not Found"}
+POST http://localhost:8083/api/orders -> HTTP 404
+{"detail":"Dependency resource not found","instance":"/api/orders","status":404,"title":"Not Found"}
+GET http://localhost:8083/api/orders?buyerId=missing-user -> HTTP 200
+[]
+GET http://localhost:8083/api/orders?buyerId=2c2bef50-c3e1-43ae-8bae-8b164495702e -> HTTP 200
+[{"id":"08a3f59e-abad-4cdd-9155-61685522cff7","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"COMPLETED","createdAt":"2026-10-31T11:20:21.553133"},{"id":"fa89dde3-172f-4dea-94db-1cab541949fe","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CANCELLED","createdAt":"2026-10-31T11:20:18.438644"}]
+PASS: missing resources returned 404; order count remains 2
+=== Self purchase: product must remain ON_SALE ===
+POST http://localhost:8082/api/items -> HTTP 201
+{"id":"ed8031fa-9c07-4a1a-af33-f3403371c785","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"ON_SALE","createdAt":"2026-10-31T11:20:23.633360833"}
+POST http://localhost:8083/api/orders -> HTTP 409
+{"detail":"Dependency business conflict","instance":"/api/orders","status":409,"title":"Conflict"}
+GET http://localhost:8082/api/items/ed8031fa-9c07-4a1a-af33-f3403371c785 -> HTTP 200
+{"id":"ed8031fa-9c07-4a1a-af33-f3403371c785","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"ON_SALE","createdAt":"2026-10-31T11:20:23.633361"}
+ Container campustrade-microservices-product-service-1 Stopping
+ Container campustrade-microservices-product-service-1 Stopped
+POST http://localhost:8083/api/orders -> HTTP 503
+{"detail":"Dependency unavailable or timed out","instance":"/api/orders","status":503,"title":"Service Unavailable"}
+GET http://localhost:8083/api/orders?buyerId=2c2bef50-c3e1-43ae-8bae-8b164495702e -> HTTP 200
+[{"id":"08a3f59e-abad-4cdd-9155-61685522cff7","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"COMPLETED","createdAt":"2026-10-31T11:20:21.553133"},{"id":"fa89dde3-172f-4dea-94db-1cab541949fe","itemId":"a42ff66e-0dc5-41c5-92fa-8be47d2c6b92","buyerId":"2c2bef50-c3e1-43ae-8bae-8b164495702e","amount":12.50,"status":"CANCELLED","createdAt":"2026-10-31T11:20:18.438644"}]
+ Container campustrade-microservices-products-db-1 Waiting
+ Container campustrade-microservices-products-db-1 Healthy
+ Container campustrade-microservices-product-service-1 Starting
+ Container campustrade-microservices-product-service-1 Started
+curl: (52) Empty reply from server
+curl: (52) Empty reply from server
+curl: (52) Empty reply from server
+GET http://localhost:8082/api/items/ed8031fa-9c07-4a1a-af33-f3403371c785 -> HTTP 200
+{"id":"ed8031fa-9c07-4a1a-af33-f3403371c785","sellerId":"7fd307ed-c299-4d1f-936a-8800d41d9cba","title":"Smoke Book","description":"week06","price":12.50,"status":"ON_SALE","createdAt":"2026-10-31T11:20:23.633361"}
+PASS: dependency outage returned 503; order count remains 2; product remains ON_SALE
+PASS: health, cross-service lifecycle, conflicts and missing resources
+ Container campustrade-microservices-products-db-1 Waiting
+ Container campustrade-microservices-products-db-1 Healthy
