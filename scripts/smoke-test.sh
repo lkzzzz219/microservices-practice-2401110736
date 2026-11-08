@@ -12,12 +12,14 @@ trap 'rm -rf "$tmp"' EXIT
 json() { python3 -c 'import json,sys; v=json.load(sys.stdin); print(v[sys.argv[1]])' "$1"; }
 expect() {
   local expected="$1" method="$2" url="$3" data="${4:-}" code
-  local args=(-sS --connect-timeout 5 --max-time 20 -o "$tmp/body" -w '%{http_code}' -X "$method")
+  local args=(-D "$tmp/headers" -sS --connect-timeout 5 --max-time 20 -o "$tmp/body" -w '%{http_code}' -X "$method")
+  if [[ "$url" == "$NACOS_CONSOLE_URL" ]]; then args+=(-L --max-redirs 5); fi
   if [[ -n "$data" ]]; then args+=(-H 'Content-Type: application/json' --data "$data"); fi
   code="$(curl "${args[@]}" "$url")"
   printf '%s %s -> HTTP %s\n' "$method" "$url" "$code" >&2
-  cat "$tmp/body" >&2; echo >&2
+  if [[ "$url" != "$NACOS_CONSOLE_URL" ]]; then cat "$tmp/body" >&2; echo >&2; fi
   [[ "$code" == "$expected" ]] || { echo "Expected HTTP $expected" >&2; exit 1; }
+  python3 -c 'import sys; print("".join(x for x in open(sys.argv[1]) if x.lower().startswith("x-discovery-")),end="")' "$tmp/headers" >&2
   cat "$tmp/body"
 }
 assert_field() {
@@ -26,6 +28,9 @@ assert_field() {
   [[ "$actual" == "$3" ]] || { echo "Expected $2=$3, got $actual" >&2; exit 1; }
 }
 count_orders() { expect 200 GET "$ORDER_URL/api/orders?buyerId=$buyer" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))'; }
+echo '=== Nacos console ==='
+NACOS_CONSOLE_URL="${NACOS_CONSOLE_URL:-$(python3 -c 'import sys; sys.path.insert(0,"scripts"); import importlib; m=importlib.import_module("nacos-admin"); print("http://localhost:"+m.config().get("NACOS_CONSOLE_PORT","18080")+"/")')}"
+expect 200 GET "$NACOS_CONSOLE_URL" >/dev/null
 echo '=== Health checks ==='
 for url in "$USER_URL" "$PRODUCT_URL" "$ORDER_URL"; do
   ready=false
@@ -72,14 +77,21 @@ if [[ "${1:-}" == '--with-outage' ]]; then
   restore() { docker compose start product-service >/dev/null; rm -rf "$tmp"; }
   trap restore EXIT
   docker compose stop product-service
+  python3 scripts/nacos-admin.py wait-down product-service
   expect 503 POST "$ORDER_URL/api/orders" "{\"itemId\":\"$item2\",\"buyerId\":\"$buyer\"}" >/dev/null
   [[ "$(count_orders)" == "$before" ]]
+  echo "PASS: dependency outage returned 503; order count remains $before"
   docker compose start product-service
+  python3 scripts/nacos-admin.py wait-up product-service
   for ((attempt=0; attempt<60; attempt++)); do
     if curl -fsS --max-time 3 "$PRODUCT_URL/actuator/health" >/dev/null; then break; fi
     sleep 2
   done
   assert_field "$(expect 200 GET "$PRODUCT_URL/api/items/$item2")" status ON_SALE
-  echo "PASS: dependency outage returned 503; order count remains $before; product remains ON_SALE"
+  restored="$(expect 201 POST "$ORDER_URL/api/orders" "{\"itemId\":\"$item2\",\"buyerId\":\"$buyer\"}")"
+  assert_field "$restored" status CREATED
+  assert_field "$(expect 200 GET "$PRODUCT_URL/api/items/$item2")" status RESERVED
+  [[ "$(count_orders)" == 3 ]]
+  echo 'PASS: recovery returned 201; order count 2 -> 3; product ON_SALE -> RESERVED'
 fi
 echo 'PASS: health, cross-service lifecycle, conflicts and missing resources'

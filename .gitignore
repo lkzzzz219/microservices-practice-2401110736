@@ -7,3 +7,12 @@ Thumbs.db
 .idea/
 *.iml
 .vscode/
+
+# Local verification and secrets
+.artifacts/
+.env.*
+!.env.example
+**/target/
+**/.data/
+**/test-run.log
+__pycache__/

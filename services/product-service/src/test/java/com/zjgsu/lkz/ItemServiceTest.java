@@ -14,8 +14,19 @@ import static org.junit.jupiter.api.Assertions.*;
 class ItemServiceTest {
     @Autowired ItemService items;
     @Autowired ItemRepository repository;
-    @DynamicPropertySource static void urls(DynamicPropertyRegistry r) { r.add("clients.user-url",DependencyFixture::url); }
-    @BeforeEach void reset() { repository.deleteAll(); DependencyFixture.status=200; DependencyFixture.body="{}"; DependencyFixture.delay=0; }
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.springframework.cloud.client.discovery.DiscoveryClient discovery;
+    private void available() {
+        var uri=java.net.URI.create(DependencyFixture.url());
+        org.mockito.Mockito.when(discovery.getInstances(org.mockito.ArgumentMatchers.anyString())).thenReturn(
+            java.util.List.of(new org.springframework.cloud.client.DefaultServiceInstance("fixture", "fixture", uri.getHost(), uri.getPort(), false)));
+    }
+    @BeforeEach void reset() { available(); repository.deleteAll(); DependencyFixture.status=200; DependencyFixture.body="{}"; DependencyFixture.delay=0; }
+    @Test void emptyInstancesWriteNothing() {
+        org.mockito.Mockito.when(discovery.getInstances("user-service")).thenReturn(java.util.List.of());
+        var e=assertThrows(ResponseStatusException.class,()->items.create("seller","Book","",BigDecimal.ONE));
+        assertEquals(503,e.getStatusCode().value()); assertEquals(0,repository.count());
+    }
     @AfterAll static void close() { DependencyFixture.server.stop(0); }
     @Test void reserveAndReleaseBelongToOrder() {
         var i=items.create("seller","Book","",new BigDecimal("10.00"));

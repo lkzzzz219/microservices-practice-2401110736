@@ -1,3 +1,5 @@
+> Week 07 已升级：首次启动请按 [总 README](../README.md) 初始化 Nacos 3.2.4。固定业务地址 USER_SERVICE_URL / PRODUCT_SERVICE_URL 已移除，改为 DiscoveryClient；注册地址和凭据来自 NACOS_SERVER_ADDR、NACOS_USERNAME、NACOS_PASSWORD，分组 PERSONAL_GROUP，默认 public。测试当前为用户 2、商品 4、订单 8 个，已关闭真实 Nacos 注册。下文保留第 06 周运行说明，当前初始化与连接配置以总 README 为准。
+
 # CampusTrade Week 06 微服务运行说明
 
 ## 快速开始（Week 06 微服务拆分）

@@ -12,12 +12,32 @@ import static org.junit.jupiter.api.Assertions.*;
 class OrderServiceTest {
     @Autowired OrderService orders;
     @Autowired OrderRepository repository;
-    @DynamicPropertySource static void urls(DynamicPropertyRegistry r) {
-        r.add("clients.user-url",DependencyFixture::url); r.add("clients.product-url",DependencyFixture::url);
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    org.springframework.cloud.client.discovery.DiscoveryClient discovery;
+    private void available() {
+        var uri=java.net.URI.create(DependencyFixture.url());
+        org.mockito.Mockito.when(discovery.getInstances(org.mockito.ArgumentMatchers.anyString())).thenReturn(
+            java.util.List.of(new org.springframework.cloud.client.DefaultServiceInstance("fixture", "fixture", uri.getHost(), uri.getPort(), false)));
     }
-    @BeforeEach void reset() {
+    @BeforeEach void reset() { available();
         repository.deleteAll(); DependencyFixture.status=200; DependencyFixture.delay=0;
         DependencyFixture.body="{\"id\":\"item-1\",\"sellerId\":\"seller\",\"price\":12.50,\"status\":\"RESERVED\"}";
+    }
+    @Test void emptyInstancesWriteNothing() {
+        org.mockito.Mockito.when(discovery.getInstances("user-service")).thenReturn(java.util.List.of());
+        var e=assertThrows(ResponseStatusException.class,()->orders.placeOrder("item-1","buyer"));
+        assertEquals(503,e.getStatusCode().value()); assertEquals(0,repository.count());
+    }
+    @Test void emptyProductInstancesWriteNothing() {
+        org.mockito.Mockito.when(discovery.getInstances("product-service")).thenReturn(java.util.List.of());
+        var e=assertThrows(ResponseStatusException.class,()->orders.placeOrder("item-1","buyer"));
+        assertEquals(503,e.getStatusCode().value()); assertEquals(0,repository.count());
+    }
+    @Test void eachOperationDiscoversAgain() {
+        orders.placeOrder("item-1","buyer");
+        org.mockito.Mockito.when(discovery.getInstances("product-service")).thenReturn(java.util.List.of());
+        assertThrows(ResponseStatusException.class,()->orders.placeOrder("item-2","buyer"));
+        assertEquals(1,repository.count());
     }
     @AfterAll static void close() { DependencyFixture.server.stop(0); }
     @Test void httpReservationThenLocalOrder() {

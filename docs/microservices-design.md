@@ -59,3 +59,22 @@ sequenceDiagram
 ## “远端成功、本地失败”窗口
 
 商品锁定已提交后，若 HTTP 响应丢失、订单服务崩溃或订单数据库写入失败，商品可能 RESERVED 而订单不存在。取消/成交同样可能商品已释放/售出、本地订单仍 CREATED。Spring `@Transactional` 只覆盖本服务数据库，无法回滚已提交的远端请求。当前应记录商品 reservation_id 与订单 ID，人工查询核对并恢复；本周不实现自动补偿，客户端也不应盲目重试。测试和烟测验证正常顺序及失败前无本地写入，不声称已解决这个窗口。
+
+
+## Week 07：注册与发现演进
+
+原 user-service（8081）、product-service（8082）、order-service（8083）及数据库归属保持不变。三个服务注册到 Nacos 3.2.4，使用同一 public 命名空间和 PERSONAL_GROUP，不与课堂 COURSE_GROUP 混用。同一服务的多个实例继续使用相同 spring.application.name。
+
+Week 06 的 clients.user-url / product-url 和固定地址环境变量在 Week 07 已移除。现在每次 RemoteApi 操作通过 DiscoveryClient.getInstances(serviceName) 查询当前已知实例、取 getUri() 并拼接原 API 路径发 HTTP 请求。空列表或连接失败返回 503，资源不存在返回 404；保留 2000 / 3000ms 超时。本地事务和远端部分成功的窗口仍存在。
+
+```mermaid
+flowchart LR
+    U[user-service :8081] -.注册.-> N[Nacos 3.2.4 / PERSONAL_GROUP]
+    P[product-service :8082] -.注册与发现.-> N
+    O[order-service :8083] -.注册与发现.-> N
+    O -->|实例 URI / HTTP 用户校验| U
+    O -->|实例 URI / HTTP 商品预订| P
+    P -->|实例 URI / HTTP 卖家校验| U
+```
+
+Nacos 仅提供实例信息，不转发上述业务 HTTP 请求。启动、鉴权、端口和上下线验证见 [Week 07](homework/week-07/index.md)。

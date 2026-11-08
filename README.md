@@ -5,7 +5,51 @@
 > **学号**：2401110736
 > **仓库用途**：本课程唯一项目仓库，用于记录从需求分析、单体开发到微服务拆分、测试、部署与文档整理的全过程，每周作业见 [`docs/homework/`](docs/homework/)。
 
-## 快速开始（当前进度：Week 06 微服务拆分）
+## 快速开始（Week 07：Nacos 服务注册与发现）
+
+继续使用 Week 06 原有的三个服务，统一在 Nacos 3.2.4 的 public 命名空间、`PERSONAL_GROUP` 分组注册；商品发布和下单流程已改用 DiscoveryClient 获取实例 URI 后发送 HTTP 请求。服务名和数据归属保持不变。
+
+- [Week 07 作业、运行记录与截图清单](docs/homework/week-07/index.md)
+- [服务边界与架构](docs/microservices-design.md)
+
+从仓库根目录依次执行（Docker Desktop、Python 3）：
+
+```bash
+# 生成被忽略的 .env 中缺失的私密值，保留已有值，不打印密码或 Token
+python scripts/nacos-admin.py prepare
+# 首次只启动 Nacos；等待初始化及登录验证成功，再启动业务服务
+docker compose up -d nacos
+python scripts/nacos-admin.py init
+docker compose up -d --build
+python scripts/nacos-admin.py list
+docker compose ps
+# Windows 用 Git Bash；需要 curl、Python 3
+bash scripts/smoke-test.sh
+bash scripts/smoke-test.sh --with-outage
+```
+
+控制台：[http://localhost:18080/](http://localhost:18080/)，使用本地 .env 的 NACOS_USERNAME / NACOS_PASSWORD 登录，在 public 中查询 PERSONAL_GROUP 并打开实例详情。HTTP 管理端口映射 18849:8848，SDK gRPC 映射 19849:9848；控制台 18080:8080，三者用途不同。Nacos 端口仅发布到 127.0.0.1。配置模板见 [.env.example](.env.example)，真实 Token、身份密钥和密码只放 .env；不要截图 .env 或原始登录响应。
+
+Nacos 的 nacos-data / nacos-logs 与三个数据库卷分别持久化；`docker compose down` 保留数据，再执行 `docker compose up -d` 即可重启。已有管理员密码不会随 .env 修改自动重置；不要删除数据卷来解决密码不一致。宿主机原生运行服务时设置 NACOS_SERVER_ADDR=localhost:18849；Compose 内为 nacos:8848。NACOS_GROUP 默认 PERSONAL_GROUP，NACOS_NAMESPACE 默认空（public），地址、用户名、密码和隔离值都能由环境变量覆盖；自定义命名空间需先创建并填写真实 ID。
+
+下单依次发现 user-service 和 product-service，空实例或旧地址连接失败返回 503、资源不存在返回 404，失败不新增订单。连接/读取超时仍由 HTTP_CONNECT_TIMEOUT_MS / HTTP_READ_TIMEOUT_MS 配置。旧固定业务地址 USER_SERVICE_URL / PRODUCT_SERVICE_URL 已移除。响应 X-Discovery-* 和业务日志可核对实际实例 IP / 端口。
+
+三个服务的测试均不依赖真实 Nacos 或 MySQL。分别进入对应目录运行：
+
+```bash
+cd services/user-service
+./mvnw test
+# 在另一个仓库根目录终端：
+cd services/product-service
+./mvnw test
+# 在另一个仓库根目录终端：
+cd services/order-service
+./mvnw test
+```
+
+PowerShell 使用 `.\mvnw.cmd test`。也可在根目录执行 `mvn -f services/<服务名>/pom.xml test`。测试使用 H2、模拟 DiscoveryClient 和 loopback HTTP 响应，并关闭 Nacos 自动注册；用户 2、商品 4、订单 8 个测试全部通过，包含空实例与每次操作重新发现的断言。
+
+## Week 06 微服务基础（保留说明；当前启动请使用上方 Week 07 步骤）
 
 第 6 周已完成用户、商品、订单三个独立 Spring Boot 服务，使用独立数据库和账号，通过 RestTemplate 进行 HTTP 协作。原 `monolith/` 保留，新增服务位于 `services/`，基础包为 `com.zjgsu.lkz`。
 
@@ -378,3 +422,5 @@ sequenceDiagram
 - [Week 06：微服务拆分、HTTP 协作与本地编排](docs/homework/week-06/index.md)
 - [微服务设计与架构图](docs/microservices-design.md)
 - [微服务运行与测试说明](services/README.md)
+
+- [Week 07：Nacos 服务注册与发现](docs/homework/week-07/index.md)

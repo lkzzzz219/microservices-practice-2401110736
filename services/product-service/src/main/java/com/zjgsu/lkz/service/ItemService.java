@@ -3,7 +3,6 @@ import com.zjgsu.lkz.client.RemoteApi;
 import com.zjgsu.lkz.repository.ItemRepository;
 import com.zjgsu.lkz.model.*;
 import com.zjgsu.lkz.exception.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
@@ -13,12 +12,11 @@ import java.time.LocalDateTime;
 public class ItemService {
     private final ItemRepository items;
     private final RemoteApi api;
-    private final String userUrl;
-    public ItemService(ItemRepository items, RemoteApi api, @Value("${clients.user-url}") String userUrl) {
-        this.items=items; this.api=api; this.userUrl=userUrl;
+    public ItemService(ItemRepository items, RemoteApi api) {
+        this.items=items; this.api=api;
     }
     public Item create(String seller, String title, String description, BigDecimal price) {
-        api.get(userUrl+"/api/users/"+seller, Map.class);
+        api.get("user-service", "/api/users/"+seller, Map.class);
         return items.save(new Item(UUID.randomUUID().toString(),seller,title,description,price,ItemStatus.ON_SALE,LocalDateTime.now()));
     }
     public List<Item> listOnSale() { return items.findByStatus(ItemStatus.ON_SALE); }
