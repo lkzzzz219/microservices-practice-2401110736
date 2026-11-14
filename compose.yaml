@@ -73,10 +73,11 @@ services:
       timeout: 5s
       retries: 40
       start_period: 30s
-  product-service:
+  product-service: &product-service
     build: ./services/product-service
-    image: campustrade/product-service:week07
-    environment:
+    image: campustrade/product-service:week08
+    environment: &product-environment
+      INSTANCE_ID: product-a
       DB_URL: jdbc:mysql://products-db:3306/campustrade_products
       DB_USER: products_app
       DB_PASSWORD: ${PRODUCTS_DB_PASSWORD:-products_local_week06}
@@ -96,6 +97,13 @@ services:
       timeout: 3s
       retries: 40
       start_period: 30s
+  product-service-2:
+    <<: *product-service
+    environment:
+      <<: *product-environment
+      INSTANCE_ID: product-b
+    ports:
+      - "8084:8082"
   orders-db:
     image: mysql:8.4.11
     environment:
@@ -113,7 +121,7 @@ services:
       start_period: 30s
   order-service:
     build: ./services/order-service
-    image: campustrade/order-service:week07
+    image: campustrade/order-service:week08
     environment:
       DB_URL: jdbc:mysql://orders-db:3306/campustrade_orders
       DB_USER: orders_app

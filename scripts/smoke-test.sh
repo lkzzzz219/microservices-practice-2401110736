@@ -74,14 +74,14 @@ expect 409 POST "$ORDER_URL/api/orders" "{\"itemId\":\"$item2\",\"buyerId\":\"$s
 assert_field "$(expect 200 GET "$PRODUCT_URL/api/items/$item2")" status ON_SALE
 if [[ "${1:-}" == '--with-outage' ]]; then
   command -v docker >/dev/null
-  restore() { docker compose start product-service >/dev/null; rm -rf "$tmp"; }
+  restore() { docker compose start product-service product-service-2 >/dev/null; rm -rf "$tmp"; }
   trap restore EXIT
-  docker compose stop product-service
+  docker compose stop product-service product-service-2
   python3 scripts/nacos-admin.py wait-down product-service
   expect 503 POST "$ORDER_URL/api/orders" "{\"itemId\":\"$item2\",\"buyerId\":\"$buyer\"}" >/dev/null
   [[ "$(count_orders)" == "$before" ]]
   echo "PASS: dependency outage returned 503; order count remains $before"
-  docker compose start product-service
+  docker compose start product-service product-service-2
   python3 scripts/nacos-admin.py wait-up product-service
   for ((attempt=0; attempt<60; attempt++)); do
     if curl -fsS --max-time 3 "$PRODUCT_URL/actuator/health" >/dev/null; then break; fi

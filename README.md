@@ -5,7 +5,31 @@
 > **学号**：2401110736
 > **仓库用途**：本课程唯一项目仓库，用于记录从需求分析、单体开发到微服务拆分、测试、部署与文档整理的全过程，每周作业见 [`docs/homework/`](docs/homework/)。
 
-## 快速开始（Week 07：Nacos 服务注册与发现）
+## Week 08 服务通信与负载均衡
+
+本周沿用三个工程，订单服务使用 OpenFeign 按 product-service 服务名预订、释放与售出商品，商品服务运行 product-a、product-b 两个实例，共用其自有数据库。实例分别发布 8082、8084，订单入口仍为 8083。实际响应中的 X-Product-Instance 和端到端统计证明两个实例都收到调用。
+
+- [调用链、接口与错误处理](docs/service-communication.md)
+- [第八周说明与截图步骤](docs/homework/week-08/index.md)
+
+首次初始化和启动按以下顺序；已有管理员时 init 验证现有凭据，不重置密码：
+
+```bash
+python scripts/nacos-admin.py prepare
+docker compose up -d nacos
+python scripts/nacos-admin.py init
+docker compose up -d --build
+# 如果冷启动时业务应用先于 Nacos SDK 就绪退出，待 init 成功后：
+docker compose start user-service product-service product-service-2 order-service
+python scripts/nacos-admin.py list
+bash scripts/e2e-test.sh
+```
+
+e2e 会创建独立测试数据、统计十二次真实预订的实例标识，验证取消/成交、404/409、停止两个商品实例后的 503 与订单数不变，再恢复并下单。依赖停止期间商品接口暂不可用。检查失败返回非零，finally 恢复停止的实例。控制台仍为 http://localhost:18080/，public / PERSONAL_GROUP；真实凭据只在本地 .env。
+
+本地测试不需要 Nacos/MySQL：分别进入 services/user-service、services/product-service、services/order-service 后运行 ./mvnw test（PowerShell 为 .\mvnw.cmd test），或在根目录执行 mvn -f services/<服务名>/pom.xml test。需要 JDK 25。H2、模拟 DiscoveryClient、测试实例 supplier 和本机 HTTP fixture 隔离外部资源。写超时可能已在远端提交，禁用自动重试，不能将超时视为未执行或业务成功。
+
+## 第七周启动说明（保留）
 
 继续使用 Week 06 原有的三个服务，统一在 Nacos 3.2.4 的 public 命名空间、`PERSONAL_GROUP` 分组注册；商品发布和下单流程已改用 DiscoveryClient 获取实例 URI 后发送 HTTP 请求。服务名和数据归属保持不变。
 

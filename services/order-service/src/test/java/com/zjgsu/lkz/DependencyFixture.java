@@ -8,15 +8,21 @@ final class DependencyFixture {
     static volatile int status=200;
     static volatile long delay=0;
     static volatile String body="{}";
+    static volatile Integer productStatus=null;
+    static volatile long productDelay=0;
+    static final java.util.concurrent.atomic.AtomicInteger productCalls=new java.util.concurrent.atomic.AtomicInteger();
     static {
         try {
             server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
             server.createContext("/",e->{
                 try {
-                    if (delay>0) Thread.sleep(delay);
+                    boolean product=e.getRequestURI().getPath().startsWith("/api/items/");
+                    if(product) productCalls.incrementAndGet();
+                    long wait=product ? Math.max(delay,productDelay) : delay;
+                    if (wait>0) Thread.sleep(wait);
                     byte[] bytes=body.getBytes(StandardCharsets.UTF_8);
                     e.getResponseHeaders().set("Content-Type","application/json");
-                    e.sendResponseHeaders(status,bytes.length);
+                    e.sendResponseHeaders(product && productStatus!=null ? productStatus : status,bytes.length);
                     e.getResponseBody().write(bytes);
                 } catch (Exception ignored) { } finally { e.close(); }
             });

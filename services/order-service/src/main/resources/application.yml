@@ -4,6 +4,11 @@ spring:
   application:
     name: order-service
   cloud:
+    loadbalancer:
+      cache:
+        enabled: false
+      retry:
+        enabled: false
     nacos:
       discovery:
         server-addr: ${NACOS_SERVER_ADDR:localhost:8848}

@@ -12,17 +12,17 @@ import java.time.LocalDateTime;
 public class OrderService {
     private final OrderRepository orders;
     private final RemoteApi api;
+    private final com.zjgsu.lkz.client.ProductGateway products;
     public record ItemSnapshot(String id, String sellerId, BigDecimal price, String status) {}
-    public OrderService(OrderRepository orders, RemoteApi api) {
-        this.orders=orders; this.api=api;
+    public OrderService(OrderRepository orders, RemoteApi api, com.zjgsu.lkz.client.ProductGateway products) {
+        this.orders=orders; this.api=api; this.products=products;
     }
     /** Remote reservation commits first; the local transaction cannot roll it back. */
     @Transactional
     public TradeOrder placeOrder(String itemId, String buyerId) {
         api.get("user-service", "/api/users/"+buyerId, Map.class);
         String id=UUID.randomUUID().toString();
-        ItemSnapshot item=api.post("product-service", "/api/items/"+itemId+"/reserve",
-            Map.of("buyerId",buyerId,"orderId",id),ItemSnapshot.class);
+        ItemSnapshot item=products.reserve(itemId,buyerId,id);
         return orders.saveAndFlush(new TradeOrder(id,item.id(),buyerId,item.price(),OrderStatus.CREATED,LocalDateTime.now()));
     }
     @Transactional public TradeOrder cancel(String id) { return finish(id,false); }
@@ -30,7 +30,7 @@ public class OrderService {
     private TradeOrder finish(String id,boolean complete) {
         TradeOrder order=orders.findForUpdate(id).orElseThrow(()->new ResourceNotFoundException("订单不存在: "+id));
         if (order.getStatus()!=OrderStatus.CREATED) throw new BusinessRuleException("订单已结束");
-        api.post("product-service", "/api/items/"+order.getItemId()+(complete ? "/sell" : "/release"),Map.of("orderId",id),Map.class);
+        products.finish(order.getItemId(),id,complete);
         order.setStatus(complete ? OrderStatus.COMPLETED : OrderStatus.CANCELLED);
         return orders.saveAndFlush(order);
     }
