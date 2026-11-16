@@ -43,4 +43,3 @@ public class ApiSecurity {
             .oauth2ResourceServer(o->o.jwt(j->j.jwtAuthenticationConverter(converter))).build();
     }
 }
-
