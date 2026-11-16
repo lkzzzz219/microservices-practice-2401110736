@@ -9,6 +9,8 @@
 
 独立网关 `services/gateway-service/` 统一提供 `8080` 入口，按服务名转发用户、商品、订单接口。登录、密码哈希与 RSA JWT 签发均位于 user-service；网关及下游独立验签，管理接口校验 ADMIN。业务下游不发布宿主机端口，身份头由网关覆盖，Feign 与 RestTemplate 透传经认证的 Bearer Token。
 
+根 `compose.yaml` 同时提供网关启动配置和三条服务名路由（`SPRING_APPLICATION_JSON`），网关 application.yml 保留相同的独立启动默认路由。
+
 | 测试账号 | 角色 | 测试密码来源 |
 | --- | --- | --- |
 | `student` | USER | 本机忽略的 `.env` 中 `AUTH_USER_PASSWORD` |

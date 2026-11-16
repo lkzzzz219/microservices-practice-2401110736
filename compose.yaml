@@ -146,6 +146,19 @@ services:
     ports:
       - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
     environment:
+      # Compose 部署使用这里的路由；application.yml 保留相同的独立启动默认配置。
+      SPRING_APPLICATION_JSON: >-
+        {"spring":{"cloud":{"gateway":{"server":{"webflux":{"routes":[
+          {"id":"users-and-auth","uri":"lb://user-service",
+           "predicates":["Path=/api/users,/api/users/**,/api/auth/**,/api/admin/**"],
+           "filters":["AddResponseHeader=X-Gateway-Route,user-service"]},
+          {"id":"products","uri":"lb://product-service",
+           "predicates":["Path=/api/items,/api/items/**"],
+           "filters":["AddResponseHeader=X-Gateway-Route,product-service"]},
+          {"id":"orders","uri":"lb://order-service",
+           "predicates":["Path=/api/orders,/api/orders/**"],
+           "filters":["AddResponseHeader=X-Gateway-Route,order-service"]}
+        ]}}}}}}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Run python scripts/auth-env.py}
       NACOS_SERVER_ADDR: nacos:8848
       NACOS_USERNAME: ${NACOS_USERNAME:-nacos}

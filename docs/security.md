@@ -10,6 +10,8 @@ RSA 2048 位密钥由 `python scripts/auth-env.py` 在本地生成，只保存�
 
 ## 路由与权限
 
+Compose 部署的三条路由直接配置在根目录 `compose.yaml` 的 gateway-service / `SPRING_APPLICATION_JSON` 中；独立启动默认路由位于网关 application.yml，两处使用相同的服务名目标和路径。
+
 | 网关路径 | 服务名目标 | 权限 |
 | --- | --- | --- |
 | `GET /actuator/health` | 网关自身 | 无需登录 |

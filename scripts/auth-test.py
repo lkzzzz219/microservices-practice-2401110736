@@ -75,6 +75,10 @@ def main():
     assert raw.stdout.strip()=='401','Downstream accepts unauthenticated direct request'
     print('PASS direct downstream request without JWT: HTTP 401',flush=True)
     config=json.loads(subprocess.run(['docker','compose','config','--format','json'],cwd=ROOT,capture_output=True,text=True,check=True).stdout)
+    gateway_config=json.loads(config['services']['gateway-service']['environment']['SPRING_APPLICATION_JSON'])
+    routes=gateway_config['spring']['cloud']['gateway']['server']['webflux']['routes']
+    assert len(routes)>=3 and {r['uri'] for r in routes}=={'lb://user-service','lb://product-service','lb://order-service'},'Compose gateway service-name routes are incomplete'
+    print('PASS root compose configures all three service-name routes',flush=True)
     for name in ['user-service','product-service','product-service-2','order-service']:
         assert not config['services'][name].get('ports'),name+' publishes a bypass port'
     print('PASS downstream business ports are not published',flush=True)

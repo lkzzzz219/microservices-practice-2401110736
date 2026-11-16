@@ -6,6 +6,8 @@
 
 独立工程为根目录 `services/gateway-service/`，使用 Spring Cloud Gateway Server WebFlux。统一业务入口为 `http://localhost:8080`，以 `lb://user-service`、`lb://product-service`、`lb://order-service` 三个服务名配置路由，Nacos 使用 public / PERSONAL_GROUP。`GET /actuator/health` 放行健康检查。路由响应带 `X-Gateway-Route`，用于核对实际转发目标。
 
+根目录 `compose.yaml` 的 gateway-service 通过 `SPRING_APPLICATION_JSON` 明确配置这三条路由，同时配置启动、8080 端口与健康检查；网关 application.yml 保留相同路由，供独立启动使用。认证脚本同时检查根 Compose 的三条服务名路由与实际 HTTP 转发结果。
+
 首次运行（根目录，Docker Desktop、Python 3；Windows Bash 命令使用 Git Bash）：
 
 ```bash
@@ -22,7 +24,9 @@ curl http://localhost:8080/actuator/health
 
 已有管理员及数据卷时保留现有 `.env`，不要用模板覆盖；prepare 不重置已有私密值。冷启动若业务服务先于 Nacos 就绪退出，等待 init 成功后 `docker compose start user-service product-service product-service-2 order-service gateway-service`。只向外发布 8080 业务端口，下游不再发布原业务端口。健康检查预期 200 / UP；实际验证结论在下方统一记录。
 
-截图由本人在当前系统实际运行后保存到 `screenshots/01-gateway.png`：展示 gateway 的 application.yml（三条服务名路由）与健康检查响应。截图尚未归档时不以生成示意图代替实拍。
+本人实际代码截图：独立网关工程的 application.yml，展示 8080 入口、三条服务名路由与健康检查配置。实际健康检查 200 与三条路由转发结果见下方测试脚本运行截图。
+
+![API Gateway：统一入口、三条服务名路由与健康检查配置](screenshots/01-gateway.png)
 
 ## 认证服务
 
@@ -36,7 +40,9 @@ python scripts/auth-test.py
 
 脚本输出登录 HTTP 200、Bearer 类型、有效期和角色，Token 始终用 `<redacted>` 表示；错误密码返回 401。密码哈希的存储、正确密码匹配、错误密码拒绝和随机盐差异有用户服务自动测试覆盖。
 
-截图保存到 `screenshots/02-auth.png`：显示认证代码、密码编码器与脚本中的两个角色登录结果。请勿截图 `.env` 或完整真实 Token。
+本人实际代码截图：AuthConfiguration.java 与 AuthController.java，展示 PBKDF2 密码编码器、USER/ADMIN 账号初始化与 RS256 JWT 签发。两个角色登录成功与错误密码拒绝结果见下方测试脚本运行截图；截图不包含真实密钥或完整 Token。
+
+![认证服务：密码哈希、两个角色与 JWT 登录签发](screenshots/02-auth.png)
 
 ## 网关鉴权
 
@@ -44,7 +50,9 @@ python scripts/auth-test.py
 
 认证流程、路由权限表、防伪造头及部署边界见 [security.md](../../security.md)。验证命令仍为 `bash scripts/auth-test.sh`：无 Token 为 401，USER 管理访问为 403，ADMIN 管理访问为 200；伪造身份头被覆盖，篡改/过期/错误签发者令牌返回 401。
 
-截图保存到 `screenshots/03-authorization.png`：展示网关角色规则、身份头过滤器与 401/403/200 实际结果。
+本人实际代码截图：IdentityHeadersFilter.java 与 SecurityConfig.java，展示客户端身份头清理覆盖、JWT 验签和 ADMIN 角色规则。401/403/200 实际结果见下方测试脚本运行截图。
+
+![网关鉴权：身份头覆盖、JWT 验签与角色规则](screenshots/03-authorization.png)
 
 ## 测试脚本
 
@@ -64,7 +72,9 @@ mvn -f services/order-service/pom.xml test
 
 脚本检查：公开健康检查、未登录拒绝、错误密码、USER/ADMIN 登录、三条真实路由、低权限越权拒绝、管理员允许、伪造头覆盖与防提权、无 Token 伪造头拒绝、篡改/过期/错误签发者拒绝、买家身份冒用拒绝、真实发布/下单/取消及 Feign Token 透传、下游无 Token 直连 401、下游端口未发布。原始日志仅放被忽略的 `.artifacts/`。
 
-截图保存到 `screenshots/04-auth-test.png`：展示测试命令、上述成功/失败状态及最终 PASS ALL。真实截图归档后在本文件添加对应相对图片链接。
+本人实际运行截图：2026-11-16 19:28:44 在个人仓库根目录通过 Git Bash 执行 scripts/auth-test.sh，展示三条路由、登录、401/403、身份头覆盖、JWT 透传和下游保护检查，最终输出 PASS ALL。Token 已由脚本隐藏为 `<redacted>`。
+
+![自动测试实际运行：路由、认证授权及下游保护全部通过](screenshots/04-auth-test.png)
 
 ## 实际验证记录
 
@@ -76,7 +86,9 @@ mvn -f services/order-service/pom.xml test
 
 再次执行 `bash scripts/auth-test.sh` 仍为 PASS ALL，验证数据无需清空即可重复运行。再次运行 `auth-env.py` 前后 `.env` 文件摘要相同，确认未改动已有密码、哈希和密钥。提交前检查本次改动不包含本地真实密码、JWT 私钥，且 `.env`、原始日志均被 Git 忽略。
 
-截图仍需本人操作后归档到本周 screenshots；归档前不把截图要求标为完成。
+本人提供的四张实际截图已归档到本周 screenshots，并在对应部分使用相对链接嵌入。归档文件与原截图逐一校验 SHA-256 一致，未修改图片内容。
+
+提交前于 2026-11-16 19:41:17 再次验证：根 compose.yaml 已显式配置三条服务名路由，Compose 配置校验通过；重新创建网关后执行 `bash scripts/auth-test.sh`，全部 HTTP 场景、Compose 路由配置与下游端口检查均 PASS，最终输出 PASS ALL。截图保持本人 19:28:44 的原始运行结果，新增检查以本次记录为准。
 
 ## 作业系统填写文字
 
