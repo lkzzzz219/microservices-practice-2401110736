@@ -37,8 +37,12 @@ services:
       start_period: 30s
   user-service:
     build: ./services/user-service
-    image: campustrade/user-service:week07
+    image: campustrade/user-service:week09
     environment:
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Run python scripts/auth-env.py}
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:?Run python scripts/auth-env.py}
+      AUTH_USER_HASH: ${AUTH_USER_HASH:?Run python scripts/auth-env.py}
+      AUTH_ADMIN_HASH: ${AUTH_ADMIN_HASH:?Run python scripts/auth-env.py}
       DB_URL: jdbc:mysql://users-db:3306/campustrade_users
       DB_USER: users_app
       DB_PASSWORD: ${USERS_DB_PASSWORD:-users_local_week06}
@@ -47,8 +51,6 @@ services:
       NACOS_PASSWORD: ${NACOS_PASSWORD:?Initialize Nacos administrator first}
       NACOS_GROUP: ${NACOS_GROUP:-PERSONAL_GROUP}
       NACOS_NAMESPACE: ${NACOS_NAMESPACE:-}
-    ports:
-      - "8081:8081"
     depends_on:
       users-db:
         condition: service_healthy
@@ -75,9 +77,10 @@ services:
       start_period: 30s
   product-service: &product-service
     build: ./services/product-service
-    image: campustrade/product-service:week08
+    image: campustrade/product-service:week09
     environment: &product-environment
       INSTANCE_ID: product-a
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Run python scripts/auth-env.py}
       DB_URL: jdbc:mysql://products-db:3306/campustrade_products
       DB_USER: products_app
       DB_PASSWORD: ${PRODUCTS_DB_PASSWORD:-products_local_week06}
@@ -86,8 +89,6 @@ services:
       NACOS_PASSWORD: ${NACOS_PASSWORD:?Initialize Nacos administrator first}
       NACOS_GROUP: ${NACOS_GROUP:-PERSONAL_GROUP}
       NACOS_NAMESPACE: ${NACOS_NAMESPACE:-}
-    ports:
-      - "8082:8082"
     depends_on:
       products-db:
         condition: service_healthy
@@ -102,8 +103,6 @@ services:
     environment:
       <<: *product-environment
       INSTANCE_ID: product-b
-    ports:
-      - "8084:8082"
   orders-db:
     image: mysql:8.4.11
     environment:
@@ -121,8 +120,9 @@ services:
       start_period: 30s
   order-service:
     build: ./services/order-service
-    image: campustrade/order-service:week08
+    image: campustrade/order-service:week09
     environment:
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Run python scripts/auth-env.py}
       DB_URL: jdbc:mysql://orders-db:3306/campustrade_orders
       DB_USER: orders_app
       DB_PASSWORD: ${ORDERS_DB_PASSWORD:-orders_local_week06}
@@ -131,13 +131,36 @@ services:
       NACOS_PASSWORD: ${NACOS_PASSWORD:?Initialize Nacos administrator first}
       NACOS_GROUP: ${NACOS_GROUP:-PERSONAL_GROUP}
       NACOS_NAMESPACE: ${NACOS_NAMESPACE:-}
-    ports:
-      - "8083:8083"
     depends_on:
       orders-db:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 30s
+  gateway-service:
+    build: ./services/gateway-service
+    image: campustrade/gateway-service:week09
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
+    environment:
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY:?Run python scripts/auth-env.py}
+      NACOS_SERVER_ADDR: nacos:8848
+      NACOS_USERNAME: ${NACOS_USERNAME:-nacos}
+      NACOS_PASSWORD: ${NACOS_PASSWORD:?Initialize Nacos administrator first}
+      NACOS_GROUP: ${NACOS_GROUP:-PERSONAL_GROUP}
+      NACOS_NAMESPACE: ${NACOS_NAMESPACE:-}
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
       interval: 5s
       timeout: 3s
       retries: 40

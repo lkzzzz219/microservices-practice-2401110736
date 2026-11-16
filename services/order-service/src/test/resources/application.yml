@@ -25,3 +25,7 @@ spring:
 clients:
   connect-timeout-ms: 200
   read-timeout-ms: 200
+
+app:
+  security:
+    enabled: false

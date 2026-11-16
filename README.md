@@ -5,6 +5,19 @@
 > **学号**：2401110736
 > **仓库用途**：本课程唯一项目仓库，用于记录从需求分析、单体开发到微服务拆分、测试、部署与文档整理的全过程，每周作业见 [`docs/homework/`](docs/homework/)。
 
+## Week 09 API Gateway 与 JWT 认证授权
+
+独立网关 `services/gateway-service/` 统一提供 `8080` 入口，按服务名转发用户、商品、订单接口。登录、密码哈希与 RSA JWT 签发均位于 user-service；网关及下游独立验签，管理接口校验 ADMIN。业务下游不发布宿主机端口，身份头由网关覆盖，Feign 与 RestTemplate 透传经认证的 Bearer Token。
+
+| 测试账号 | 角色 | 测试密码来源 |
+| --- | --- | --- |
+| `student` | USER | 本机忽略的 `.env` 中 `AUTH_USER_PASSWORD` |
+| `admin` | ADMIN | 本机忽略的 `.env` 中 `AUTH_ADMIN_PASSWORD` |
+
+密码由 `python scripts/auth-env.py` 随机生成，哈希后种入用户数据库；已有账号不会被启动脚本重置。真实密码、JWT 和私钥不提交。安装工具依赖并初始化配置：`python -m pip install -r scripts/requirements-auth.txt`、`python scripts/nacos-admin.py prepare`、`python scripts/auth-env.py`。之后单独启动 Nacos 并 init，执行 `docker compose up -d --build`。完整命令和截图归档步骤见 [第九周作业](docs/homework/week-09/index.md)，认证流程与权限表见 [安全设计](docs/security.md)。
+
+测试入口：`bash scripts/auth-test.sh`（Windows 使用 Git Bash），或 `python scripts/auth-test.py`。输出明确 PASS/FAIL 和 HTTP 状态，不显示密码和 Token；任一检查失败退出码非零。覆盖三条路由、401/403、两种角色、签名/过期/签发者、伪造身份头、下游防绕过与真实 Feign 下单取消。Week 09 起下游端口不对宿主机发布；旧周次文档中的直接访问端口命令用于其历史版本，当前运行以本节和第九周文档为准。
+
 ## Week 08 服务通信与负载均衡
 
 本周沿用三个工程，订单服务使用 OpenFeign 按 product-service 服务名预订、释放与售出商品，商品服务运行 product-a、product-b 两个实例，共用其自有数据库。实例分别发布 8082、8084，订单入口仍为 8083。实际响应中的 X-Product-Instance 和端到端统计证明两个实例都收到调用。

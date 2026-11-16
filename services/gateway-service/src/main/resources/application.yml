@@ -1,0 +1,40 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: gateway-service
+  cloud:
+    nacos:
+      discovery:
+        server-addr: ${NACOS_SERVER_ADDR:localhost:18849}
+        username: ${NACOS_USERNAME:nacos}
+        password: ${NACOS_PASSWORD}
+        group: ${NACOS_GROUP:PERSONAL_GROUP}
+        namespace: ${NACOS_NAMESPACE:}
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: users-and-auth
+              uri: lb://user-service
+              predicates:
+                - Path=/api/users,/api/users/**,/api/auth/**,/api/admin/**
+              filters:
+                - AddResponseHeader=X-Gateway-Route,user-service
+            - id: products
+              uri: lb://product-service
+              predicates:
+                - Path=/api/items,/api/items/**
+              filters:
+                - AddResponseHeader=X-Gateway-Route,product-service
+            - id: orders
+              uri: lb://order-service
+              predicates:
+                - Path=/api/orders,/api/orders/**
+              filters:
+                - AddResponseHeader=X-Gateway-Route,order-service
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

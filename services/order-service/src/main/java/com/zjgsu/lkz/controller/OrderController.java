@@ -33,6 +33,7 @@ public class OrderController {
     /** 下单：商品必须存在、在售，且买家不是卖家。 */
     @PostMapping
     public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
+        com.zjgsu.lkz.security.Ownership.require(request.buyerId());
         TradeOrder order = orderService.placeOrder(request.itemId(), request.buyerId());
         return ResponseEntity
                 .created(URI.create("/api/orders/" + order.getId()))
@@ -42,24 +43,28 @@ public class OrderController {
     /** 订单详情。 */
     @GetMapping("/{id}")
     public OrderResponse getById(@PathVariable String id) {
+        com.zjgsu.lkz.security.Ownership.require(orderService.getById(id).getBuyerId());
         return toResponse(orderService.getById(id));
     }
 
     /** 某买家的订单列表。 */
     @GetMapping(params = "buyerId")
     public List<OrderResponse> listByBuyer(@RequestParam String buyerId) {
+        com.zjgsu.lkz.security.Ownership.require(buyerId);
         return orderService.listByBuyer(buyerId).stream().map(this::toResponse).toList();
     }
 
     /** 取消订单，商品回到在售状态。 */
     @PostMapping("/{id}/cancel")
     public OrderResponse cancel(@PathVariable String id) {
+        com.zjgsu.lkz.security.Ownership.require(orderService.getById(id).getBuyerId());
         return toResponse(orderService.cancel(id));
     }
 
     /** 确认成交，商品标记为已售出。 */
     @PostMapping("/{id}/complete")
     public OrderResponse complete(@PathVariable String id) {
+        com.zjgsu.lkz.security.Ownership.require(orderService.getById(id).getBuyerId());
         return toResponse(orderService.complete(id));
     }
 

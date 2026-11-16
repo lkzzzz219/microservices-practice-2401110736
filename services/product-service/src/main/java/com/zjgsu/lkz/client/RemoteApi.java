@@ -17,6 +17,12 @@ public class RemoteApi {
         var factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(connect); factory.setReadTimeout(read);
         http = new RestTemplate(factory);
+        http.getInterceptors().add((request,body,execution)->{
+            var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if(auth instanceof org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken jwt)
+                request.getHeaders().setBearerAuth(jwt.getToken().getTokenValue());
+            return execution.execute(request,body);
+        });
     }
     public <T> T get(String service, String path, Class<T> type) { return call(service, path, null, type, false); }
     public <T> T post(String service, String path, Object body, Class<T> type) { return call(service, path, body, type, true); }

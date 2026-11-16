@@ -32,6 +32,7 @@ public class ItemController {
     /** 发布商品。 */
     @PostMapping
     public ResponseEntity<ItemResponse> create(@Valid @RequestBody CreateItemRequest request) {
+        com.zjgsu.lkz.security.Ownership.require(request.sellerId());
         Item item = itemService.create(request.sellerId(), request.title(),
                 request.description(), request.price());
         return ResponseEntity
